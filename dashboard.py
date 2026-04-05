@@ -35,6 +35,8 @@ le           = bundle['label_encoder']
 feature_cols = bundle['features']
 model_name   = bundle['model_name']
 
+MYR_TO_EUR = 0.21
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def add_interactions(X):
@@ -45,7 +47,6 @@ def add_interactions(X):
     X['palin_lucky']      = X['is_palindrome'] * X['lucky_count']
     X['digits_x_repeat']  = X['num_digits'] * X['max_repeat']
     X['unlucky_weighted'] = X['unlucky_count'] * X['num_digits']
-    # Sécurité : remplacer inf et NaN par 0
     X = X.replace([float('inf'), float('-inf')], 0).fillna(0)
     return X
 
@@ -58,7 +59,6 @@ def predict_price(plate: str):
     X = X[feature_cols]
     log_price = model.predict(X)[0]
     price = float(np.exp(log_price))
-    # Fourchette ±30% (MAPE du modèle)
     low  = price * 0.70
     high = price * 1.30
     return price, low, high
@@ -67,7 +67,6 @@ def get_factors(plate: str):
     plate = plate.strip().upper()
     letters    = re.sub(r'[^A-Z]', '', plate)
     digits_str = re.sub(r'[^0-9]', '', plate)
-    digits     = int(digits_str) if digits_str else 0
     factors = []
 
     if len(digits_str) == 1:
@@ -112,12 +111,11 @@ def is_valid_plate(plate: str) -> bool:
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 
-st.title("🚗 Malaysian Plate Price Estimator")
+st.title("Prix plaques Malaisie")
 st.caption("Estimez la valeur marchande d'une plaque d'immatriculation spéciale malaisienne")
 
 st.divider()
 
-# Input
 plate_input = st.text_input(
     "Entrez une plaque",
     placeholder="ex: WMA 4, EV 8888, KH 1...",
@@ -129,7 +127,6 @@ col_btn, _ = st.columns([1, 3])
 with col_btn:
     estimate = st.button("Estimer le prix", type="primary", use_container_width=True)
 
-# Résultat
 if estimate and plate_input:
     if not is_valid_plate(plate_input):
         st.error("Plaque invalide — utilisez uniquement des lettres et des chiffres.")
@@ -138,17 +135,15 @@ if estimate and plate_input:
             price, low, high = predict_price(plate_input)
 
             st.divider()
-
-            # Prix central
             st.markdown(f"### Plaque : `{plate_input}`")
+
             col1, col2, col3 = st.columns(3)
-            col1.metric("Prix bas estimé", f"RM {low:,.0f}")
-            col2.metric("Prix central", f"RM {price:,.0f}")
-            col3.metric("Prix haut estimé", f"RM {high:,.0f}")
-
-            st.caption(f"Fourchette basée sur la marge d'erreur du modèle (±30% — MAPE=31.7%)")
-
-            # Facteurs
+            col1.metric("Prix bas estimé", f"RM {low:_.0f}".replace('_', ' '))
+            col1.markdown(f"<p style='font-size:1.1rem;margin-top:-15px'>{low * MYR_TO_EUR:_.0f}€</p>".replace('_', ' '), unsafe_allow_html=True)
+            col2.metric("Prix central", f"RM {price:_.0f}".replace('_', ' '))
+            col2.markdown(f"<p style='font-size:1.1rem;margin-top:-15px'>{price * MYR_TO_EUR:_.0f}€</p>".replace('_', ' '), unsafe_allow_html=True)
+            col3.metric("Prix haut estimé", f"RM {high:_.0f}".replace('_', ' '))
+            col3.markdown(f"<p style='font-size:1.1rem;margin-top:-15px'>{high * MYR_TO_EUR:_.0f}€</p>".replace('_', ' '), unsafe_allow_html=True)
             st.divider()
             st.markdown("**Facteurs de valeur détectés :**")
             for icon, text in get_factors(plate_input):
@@ -187,4 +182,4 @@ with col_b:
     )
 
 st.divider()
-st.caption(f"Modèle : {model_name} | Données : Motor Trader (web scraping) | 2\,879 plaques")
+st.caption(f"Modèle : {model_name} | Données : Motor Trader (web scraping) | 2 879 plaques")
